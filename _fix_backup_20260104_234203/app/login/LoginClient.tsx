@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabaseBrowser } from "@/app/lib/supabase/browser";
+import { supabaseBrowser } from "../lib/supabaseBrowser";
 
 type Mode = "login" | "register" | "reset";
 
@@ -369,4 +369,3 @@ export default function LoginClient() {
     </main>
   );
 }
-

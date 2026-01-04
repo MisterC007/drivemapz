@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { supabaseBrowser } from "@/app/lib/supabase/browser"
+import { supabaseBrowser } from '@/app/lib/supabase/browser'
 import { Capacitor } from '@capacitor/core'
 import { Geolocation } from '@capacitor/geolocation'
 
@@ -156,4 +156,3 @@ export async function stopTracking() {
     webWatchId = null
   }
 }
-
