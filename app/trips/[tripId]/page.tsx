@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import type { Database } from '@/app/lib/database.types'
-import { supabase } from '@/app/lib/supabaseClient'
 import { startTracking, stopTracking } from '@/app/lib/tracking'
+import { supabaseBrowser } from "@/app/lib/supabase/browser";
+const supabase = supabaseBrowser();
 
 const TripMap = dynamic(() => import('@/app/components/TripMap'), { ssr: false })
 
