@@ -49,29 +49,43 @@ export default function LoginClient() {
     };
   }, [supabase, router, next]);
 
-  async function doLogin() {
-    setMsg('');
-    if (!supabase) {
-      setMsg('Supabase ontbreekt. Check NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY.');
-      return;
-    }
-
-    setBusy(true);
-    try {
-      const e = email.trim();
-      if (!e) throw new Error('Vul je e-mailadres in.');
-      if (!password) throw new Error('Vul je wachtwoord in.');
-
-      const { error } = await supabase.auth.signInWithPassword({ email: e, password });
-      if (error) throw error;
-
-      router.replace(next);
-    } catch (e: any) {
-      setMsg(`Login fout: ${e?.message ?? String(e)}`);
-    } finally {
-      setBusy(false);
-    }
+async function doLogin() {
+  setMsg('');
+  if (!supabase) {
+    setMsg('Supabase ontbreekt. Check NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY in Vercel.');
+    return;
   }
+
+  setBusy(true);
+  try {
+    const e = email.trim();
+    if (!e) throw new Error('Vul je e-mailadres in.');
+    if (!password) throw new Error('Vul je wachtwoord in.');
+
+    console.log('[LOGIN] start', e);
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email: e, password });
+
+    if (error) {
+      console.error('[LOGIN] error', error);
+      throw error;
+    }
+
+    console.log('[LOGIN] ok user=', data.user?.id);
+
+    // extra zekerheid: session check
+    const { data: sess, error: sessErr } = await supabase.auth.getSession();
+    if (sessErr) console.warn('[LOGIN] session error', sessErr);
+    console.log('[LOGIN] session?', !!sess.session);
+
+    router.replace(next);
+  } catch (e: any) {
+    setMsg(`Login fout: ${e?.message ?? String(e)}`);
+  } finally {
+    setBusy(false);
+  }
+}
+
 
   async function doSignup() {
     setMsg('');
@@ -124,14 +138,16 @@ export default function LoginClient() {
 
   return (
     <main className="mx-auto max-w-md p-6">
-      <div className="flex flex-col items-center gap-3 mt-8">
-        <img
-          src="/brand/drivemapz-logo.png"
-          alt="DriveMapz"
-          className="h-64 w-auto mb-0"
-        />
-        <div className="text-sm opacity-70">Trips • Stops • Fuel • Toll • Tracking</div>
-      </div>
+<div className="flex flex-col items-center gap-1 mt-6">
+  <img
+    src="/brand/drivemapz-logo.png"
+    alt="DriveMapz"
+    className="h-64 w-auto"
+  />
+  <div className="text-sm opacity-70 -mt-1">
+    Trips • Stops • Fuel • Toll • Tracking
+  </div>
+</div>
 
       <section className="mt-8 rounded-2xl border p-5">
         <div className="flex gap-2 mb-4">
