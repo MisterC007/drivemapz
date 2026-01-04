@@ -3,23 +3,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from './lib/database.types';
+import type { Database } from '@/app/lib/database.types';
 
-
-type TripRow = {
-  id: string;
-  name: string;
-  start_date: string | null;
-  end_date: string | null;
-  created_at: string | null;
-};
+type TripRow = Database['public']['Tables']['trips']['Row'];
 
 function getSupabase(): SupabaseClient<Database> {
   const g = globalThis as any;
 
   if (!g.__sb) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    // Dit voorkomt "supabaseUrl is required" in rare gevallen lokaal
+    if (!url || !key) {
+      throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY');
+    }
 
     g.__sb = createClient<Database>(url, key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
@@ -28,7 +26,6 @@ function getSupabase(): SupabaseClient<Database> {
 
   return g.__sb as SupabaseClient<Database>;
 }
-
 
 export default function TripsPage() {
   const router = useRouter();
@@ -52,6 +49,7 @@ export default function TripsPage() {
       setLoading(false);
       return;
     }
+
     const uid = s.session?.user?.id;
     if (!uid) {
       setSessionUserId('');
@@ -66,12 +64,12 @@ export default function TripsPage() {
 
     const { data, error } = await supabase
       .from('trips')
-      .select('id,name,start_date,end_date,created_at')
+      .select('id,name,start_date,end_date,created_at,user_id')
       .eq('user_id', uid)
       .order('created_at', { ascending: false });
 
     if (error) setMsg(error.message);
-    setTrips((data as TripRow[]) ?? []);
+    setTrips(data ?? []);
     setLoading(false);
   }
 
@@ -79,10 +77,12 @@ export default function TripsPage() {
     setMsg('');
     const { data: s } = await supabase.auth.getSession();
     const uid = s.session?.user?.id;
+
     if (!uid) {
       setMsg('Niet ingelogd. Ga eerst naar Login.');
       return;
     }
+
     const tname = name.trim();
     if (!tname) {
       setMsg('Geef een naam voor de trip.');
@@ -128,7 +128,9 @@ export default function TripsPage() {
         <div className="flex items-center gap-3">
           {sessionUserId ? (
             <>
-              <div className="text-sm opacity-80">Ingelogd als: <b>{email}</b></div>
+              <div className="text-sm opacity-80">
+                Ingelogd als: <b>{email}</b>
+              </div>
               <button
                 className="rounded-lg border px-4 py-2"
                 onClick={() => router.push('/settings')}
