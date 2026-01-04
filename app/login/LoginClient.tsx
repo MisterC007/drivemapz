@@ -124,10 +124,15 @@ export default function LoginClient() {
   return (
     <main className="mx-auto max-w-md p-6">
       <div className="flex flex-col items-center gap-3 mt-8">
-        <img src="/brand/drivemapz-logo.png" alt="DriveMapz" className="h-16 w-16" />
-        <h1 className="text-3xl font-semibold">DriveMapz</h1>
-        <div className="text-sm opacity-70">Trips • Stops • Fuel • Toll • Tracking</div>
-      </div>
+	<img
+		src="/brand/drivemapz-logo.png"
+		alt="DriveMapz"
+		className="h-32 w-auto mb-2"
+	/>
+		<div className="text-sm opacity-70 mt-2">
+		Trips • Stops • Fuel • Toll • Tracking
+		</div>
+
 
       <section className="mt-8 rounded-2xl border p-5">
         {!supabaseReady && (
