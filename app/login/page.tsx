@@ -5,7 +5,7 @@ import { supabaseBrowser } from "@/app/lib/supabaseBrowser";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
+  const supabase = useMemo(() => supabaseBrowser, []);
   const router = useRouter();
 
   const [mode, setMode] = useState<"login" | "signup">("login");

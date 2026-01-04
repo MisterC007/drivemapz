@@ -1,97 +1,91 @@
-'use client';
+'use client'
 
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabaseBrowser } from '@/app/lib/supabaseBrowser'
 
 type CamperProfile = {
-  user_id: string;
-  vehicle_name: string | null;
-  fuel_type: string | null;
-  consumption_l_per_100km: number | null;
-  tank_capacity_l: number | null;
-};
-
-function getSupabase() {
-  const g = globalThis as any;
-  if (!g.__sb) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    g.__sb = createClient(url, key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
-    });
-  }
-  return g.__sb as ReturnType<typeof createClient>;
+  user_id: string
+  vehicle_name: string | null
+  fuel_type: string | null
+  consumption_l_per_100km: number | null
+  tank_capacity_l: number | null
 }
 
 export default function SettingsPage() {
-  const router = useRouter();
-  const supabase = useMemo(() => getSupabase(), []);
+  const router = useRouter()
+  const supabase = useMemo(() => supabaseBrowser, [])
 
-  const [loading, setLoading] = useState(true);
-  const [msg, setMsg] = useState('');
+  const [loading, setLoading] = useState(true)
+  const [msg, setMsg] = useState('')
 
-  const [email, setEmail] = useState('');
-  const [uid, setUid] = useState('');
+  const [email, setEmail] = useState('')
+  const [uid, setUid] = useState('')
 
-  // form
-  const [vehicleName, setVehicleName] = useState('Roller Team Granduca (Ducato 130)');
-  const [fuelType, setFuelType] = useState<'diesel' | 'benzine' | 'lpg' | 'elektrisch'>('diesel');
-  const [consumption, setConsumption] = useState<number>(14);
-  const [tank, setTank] = useState<number>(90);
+  const [vehicleName, setVehicleName] = useState('Roller Team Granduca (Ducato 130)')
+  const [fuelType, setFuelType] = useState<'diesel' | 'benzine' | 'lpg' | 'elektrisch'>('diesel')
+  const [consumption, setConsumption] = useState<number>(14)
+  const [tank, setTank] = useState<number>(90)
 
   async function loadProfile() {
-    setLoading(true);
-    setMsg('');
+    setLoading(true)
+    setMsg('')
 
-    const { data: s, error: sErr } = await supabase.auth.getSession();
+    const { data: s, error: sErr } = await supabase.auth.getSession()
     if (sErr) {
-      setMsg(sErr.message);
-      setLoading(false);
-      return;
+      setMsg(sErr.message)
+      setLoading(false)
+      return
     }
-    const user = s.session?.user;
+
+    const user = s.session?.user
     if (!user) {
-      setMsg('Niet ingelogd.');
-      setUid('');
-      setEmail('');
-      setLoading(false);
-      return;
+      setMsg('Niet ingelogd.')
+      setUid('')
+      setEmail('')
+      setLoading(false)
+      return
     }
-    setUid(user.id);
-    setEmail(user.email ?? '');
+
+    setUid(user.id)
+    setEmail(user.email ?? '')
 
     const { data, error } = await supabase
       .from('camper_profiles')
       .select('user_id,vehicle_name,fuel_type,consumption_l_per_100km,tank_capacity_l')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .maybeSingle()
 
     if (error) {
-      setMsg(error.message);
-      setLoading(false);
-      return;
+      setMsg(error.message)
+      setLoading(false)
+      return
     }
 
-    const p = data as CamperProfile | null;
+    const p = (data as CamperProfile | null) ?? null
     if (p) {
-      setVehicleName(p.vehicle_name ?? vehicleName);
-      setFuelType((p.fuel_type as any) ?? 'diesel');
-      setConsumption(p.consumption_l_per_100km ?? 14);
-      setTank(p.tank_capacity_l ?? 90);
+      setVehicleName(p.vehicle_name ?? vehicleName)
+      setFuelType((p.fuel_type as any) ?? 'diesel')
+      setConsumption(p.consumption_l_per_100km ?? 14)
+      setTank(p.tank_capacity_l ?? 90)
     }
 
-    setLoading(false);
+    setLoading(false)
   }
 
   async function save() {
-    setMsg('');
+    setMsg('')
 
-    const { data: s } = await supabase.auth.getSession();
-    const user = s.session?.user;
+    const { data: s, error: sErr } = await supabase.auth.getSession()
+    if (sErr) {
+      setMsg(sErr.message)
+      return
+    }
+
+    const user = s.session?.user
     if (!user) {
-      setMsg('Niet ingelogd.');
-      return;
+      setMsg('Niet ingelogd.')
+      return
     }
 
     const payload: CamperProfile = {
@@ -100,29 +94,32 @@ export default function SettingsPage() {
       fuel_type: fuelType,
       consumption_l_per_100km: Number(consumption),
       tank_capacity_l: Number(tank),
-    };
-
-    const { error } = await supabase.from('camper_profiles').upsert(payload, { onConflict: 'user_id' });
-    if (error) {
-      setMsg(error.message);
-      return;
     }
 
-    setMsg('Opgeslagen ✅');
+    const { error } = await supabase
+      .from('camper_profiles')
+      .upsert(payload, { onConflict: 'user_id' })
+
+    if (error) {
+      setMsg(error.message)
+      return
+    }
+
+    setMsg('Opgeslagen ✅')
   }
 
   async function logout() {
-    setMsg('');
-    await supabase.auth.signOut();
-    router.push('/login');
+    setMsg('')
+    await supabase.auth.signOut()
+    router.push('/login')
   }
 
   useEffect(() => {
-    loadProfile();
-    const { data: sub } = supabase.auth.onAuthStateChange(() => loadProfile());
-    return () => sub.subscription.unsubscribe();
+    loadProfile()
+    const { data: sub } = supabase.auth.onAuthStateChange(() => loadProfile())
+    return () => sub.subscription.unsubscribe()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [])
 
   return (
     <main className="mx-auto max-w-3xl p-6">
@@ -133,7 +130,11 @@ export default function SettingsPage() {
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold">Instellingen</h1>
-          {uid && <div className="text-sm opacity-70">Ingelogd als: <b>{email}</b></div>}
+          {uid && (
+            <div className="text-sm opacity-70">
+              Ingelogd als: <b>{email}</b>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3">
@@ -206,5 +207,5 @@ export default function SettingsPage() {
         )}
       </section>
     </main>
-  );
+  )
 }

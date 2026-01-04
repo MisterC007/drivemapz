@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './lib/database.types';
+
 
 type TripRow = {
   id: string;
@@ -12,17 +14,21 @@ type TripRow = {
   created_at: string | null;
 };
 
-function getSupabase() {
+function getSupabase(): SupabaseClient<Database> {
   const g = globalThis as any;
+
   if (!g.__sb) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-    g.__sb = createClient(url, key, {
+
+    g.__sb = createClient<Database>(url, key, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
     });
   }
-  return g.__sb as ReturnType<typeof createClient>;
+
+  return g.__sb as SupabaseClient<Database>;
 }
+
 
 export default function TripsPage() {
   const router = useRouter();

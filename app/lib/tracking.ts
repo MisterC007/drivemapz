@@ -8,44 +8,54 @@ type TrackInsert = {
   user_id: string
   trip_id: string
   lat: number
-  lon: number
+  lng: number
   accuracy_m?: number | null
-  speed_mps?: number | null
-  heading_deg?: number | null
+  speed?: number | null
+  heading?: number | null
 }
 
 let webWatchId: number | null = null
 let nativeStarted = false
 let lastSentAt = 0
 
+const MIN_SEND_INTERVAL_MS = 20_000
+
+function shouldSendNow() {
+  const now = Date.now()
+  if (now - lastSentAt < MIN_SEND_INTERVAL_MS) return false
+  lastSentAt = now
+  return true
+}
+
 async function insertPoint(p: TrackInsert) {
   const { error } = await supabase.from('trip_track_points').insert({
     user_id: p.user_id,
     trip_id: p.trip_id,
     lat: p.lat,
-    lon: p.lon,
+    lng: p.lng,
     accuracy_m: p.accuracy_m ?? null,
-    speed_mps: p.speed_mps ?? null,
-    heading_deg: p.heading_deg ?? null,
+    speed: p.speed ?? null,
+    heading: p.heading ?? null,
+    captured_at: new Date().toISOString(),
   })
   if (error) throw error
 }
 
+// ✅ geen import('@capacitor-community/background-geolocation')
 async function tryGetBgGeo() {
-  // Alleen op native proberen (anders nooit importen)
   if (!Capacitor.isNativePlatform()) return null
-
-  try {
-    // Let op: dynamic import in try/catch => build crasht niet als module ontbreekt
-    const mod: any = await import('@capacitor-community/background-geolocation')
-    return mod?.BackgroundGeolocation ?? null
-  } catch {
-    return null
-  }
+  const anyCap: any = Capacitor as any
+  return (
+    anyCap?.Plugins?.BackgroundGeolocation ??
+    anyCap?.Plugins?.BackgroundGeolocationPlugin ??
+    null
+  )
 }
 
 export async function startTracking(tripId: string) {
-  const { data: sess } = await supabase.auth.getSession()
+  const { data: sess, error: sessErr } = await supabase.auth.getSession()
+  if (sessErr) throw sessErr
+
   const userId = sess.session?.user?.id
   if (!userId) throw new Error('Auth session missing')
 
@@ -59,11 +69,9 @@ export async function startTracking(tripId: string) {
 
     const BackgroundGeolocation = await tryGetBgGeo()
     if (!BackgroundGeolocation) {
-      // Native, maar plugin ontbreekt => val terug naar foreground tracking of geef duidelijke fout
-      // Ik kies hier: duidelijke fout (dan weet je dat je cap setup nog moet doen)
       nativeStarted = false
       throw new Error(
-        'Background tracking plugin ontbreekt. Installeer @capacitor-community/background-geolocation en voeg Android/iOS platform toe (Capacitor).'
+        'Background tracking plugin niet gevonden in Capacitor.Plugins. Installeer plugin + npx cap sync.'
       )
     }
 
@@ -77,23 +85,23 @@ export async function startTracking(tripId: string) {
       },
       async (location: any, error: any) => {
         if (error || !location) return
+        if (!shouldSendNow()) return
 
-        const now = Date.now()
-        if (now - lastSentAt < 20000) return
-        lastSentAt = now
-
-        await insertPoint({
-          user_id: userId,
-          trip_id: tripId,
-          lat: location.latitude,
-          lon: location.longitude,
-          accuracy_m: location.accuracy,
-          speed_mps: location.speed,
-          heading_deg: location.bearing,
-        })
+        try {
+          await insertPoint({
+            user_id: userId,
+            trip_id: tripId,
+            lat: location.latitude,
+            lng: location.longitude,
+            accuracy_m: location.accuracy ?? null,
+            speed: location.speed ?? null,
+            heading: location.bearing ?? null,
+          })
+        } catch (e) {
+          console.error('insertPoint(native) failed', e)
+        }
       }
     )
-
     return
   }
 
@@ -103,28 +111,27 @@ export async function startTracking(tripId: string) {
   try {
     const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
     if (perm.state === 'denied') throw new Error('Geolocation denied in browser')
-  } catch {
-    // Safari etc.
-  }
+  } catch {}
 
   webWatchId = navigator.geolocation.watchPosition(
     async (pos) => {
-      const now = Date.now()
-      if (now - lastSentAt < 20000) return
-      lastSentAt = now
-
-      await insertPoint({
-        user_id: userId,
-        trip_id: tripId,
-        lat: pos.coords.latitude,
-        lon: pos.coords.longitude,
-        accuracy_m: pos.coords.accuracy,
-        speed_mps: pos.coords.speed ?? null,
-        heading_deg: pos.coords.heading ?? null,
-      })
+      if (!shouldSendNow()) return
+      try {
+        await insertPoint({
+          user_id: userId,
+          trip_id: tripId,
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy_m: pos.coords.accuracy ?? null,
+          speed: pos.coords.speed ?? null,
+          heading: pos.coords.heading ?? null,
+        })
+      } catch (e) {
+        console.error('insertPoint(web) failed', e)
+      }
     },
     (err) => console.error('watchPosition error', err),
-    { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    { enableHighAccuracy: true, maximumAge: 10_000, timeout: 20_000 }
   )
 }
 
@@ -133,7 +140,11 @@ export async function stopTracking() {
     nativeStarted = false
     const BackgroundGeolocation = await tryGetBgGeo()
     if (BackgroundGeolocation) {
-      await BackgroundGeolocation.removeAllWatchers()
+      try {
+        await BackgroundGeolocation.removeAllWatchers()
+      } catch (e) {
+        console.error('removeAllWatchers failed', e)
+      }
     }
     return
   }

@@ -1,20 +1,11 @@
-import { createClient } from "@supabase/supabase-js";
+// app/lib/supabaseBrowser.ts
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from './database.types'
 
-let supabaseSingleton: ReturnType<typeof createClient> | null = null;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-export function supabaseBrowser() {
-  if (supabaseSingleton) return supabaseSingleton;
+export const supabaseBrowser = createClient<Database>(supabaseUrl, supabaseAnonKey)
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  supabaseSingleton = createClient(url, anon, {
-    auth: {
-      persistSession: true,
-      autoRefreshToken: true,
-      detectSessionInUrl: true,
-    },
-  });
-
-  return supabaseSingleton;
-}
+// compat exports
+export const supabase = supabaseBrowser
