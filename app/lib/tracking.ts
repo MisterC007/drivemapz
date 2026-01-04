@@ -1,8 +1,10 @@
 'use client'
 
-import { supabase } from '@/app/lib/supabaseClient'
+import { supabaseBrowser } from '@/app/lib/supabase/browser'
 import { Capacitor } from '@capacitor/core'
 import { Geolocation } from '@capacitor/geolocation'
+
+const supabase = supabaseBrowser()
 
 type TrackInsert = {
   user_id: string
