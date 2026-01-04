@@ -191,6 +191,98 @@ export type Database = {
         Relationships: []
       }
 
+user_profiles: {
+  Row: {
+    user_id: string
+    nickname: string
+    first_name: string
+    last_name: string
+    email: string
+    street: string | null
+    house_number: string | null
+    box: string | null
+    postal_code: string | null
+    city: string | null
+    country: string | null
+    created_at: string | null
+    updated_at: string | null
+  }
+  Insert: {
+    user_id: string
+    nickname: string
+    first_name: string
+    last_name: string
+    email: string
+    street?: string | null
+    house_number?: string | null
+    box?: string | null
+    postal_code?: string | null
+    city?: string | null
+    country?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  Update: {
+    user_id?: string
+    nickname?: string
+    first_name?: string
+    last_name?: string
+    email?: string
+    street?: string | null
+    house_number?: string | null
+    box?: string | null
+    postal_code?: string | null
+    city?: string | null
+    country?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  Relationships: []
+}
+
+user_vehicles: {
+  Row: {
+    id: string
+    user_id: string
+    mode: string
+    label: string
+    make: string | null
+    model: string | null
+    avg_consumption: number | null
+    tank_capacity: number | null
+    fuel: string | null
+    created_at: string | null
+    updated_at: string | null
+  }
+  Insert: {
+    id?: string
+    user_id: string
+    mode: string
+    label: string
+    make?: string | null
+    model?: string | null
+    avg_consumption?: number | null
+    tank_capacity?: number | null
+    fuel?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  Update: {
+    id?: string
+    user_id?: string
+    mode?: string
+    label?: string
+    make?: string | null
+    model?: string | null
+    avg_consumption?: number | null
+    tank_capacity?: number | null
+    fuel?: string | null
+    created_at?: string | null
+    updated_at?: string | null
+  }
+  Relationships: []
+}
+
       camper_profiles: {
         Row: {
           id: string

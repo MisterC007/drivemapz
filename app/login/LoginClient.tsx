@@ -32,7 +32,7 @@ const FUEL_TYPES = [
 ] as const;
 
 export default function LoginClient() {
-  const supabase = supabaseBrowser;
+  const supabase = useMemo(() => supabaseBrowser(), []);
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -59,15 +59,21 @@ export default function LoginClient() {
   const [country, setCountry] = useState("België");
 
   // register: vehicle fields
-  const [vehicleKind, setVehicleKind] = useState<(typeof VEHICLE_KINDS)[number]["value"]>("camper");
+  const [vehicleKind, setVehicleKind] =
+    useState<(typeof VEHICLE_KINDS)[number]["value"]>("camper");
   const [vehicleName, setVehicleName] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
-  const [fuelType, setFuelType] = useState<(typeof FUEL_TYPES)[number]["value"]>("diesel");
+  const [fuelType, setFuelType] =
+    useState<(typeof FUEL_TYPES)[number]["value"]>("diesel");
   const [avgConsumption, setAvgConsumption] = useState<string>(""); // l/100km
   const [tankCapacity, setTankCapacity] = useState<string>(""); // liters
 
   const vehicleNeedsFuel = useMemo(() => {
-    return vehicleKind === "auto" || vehicleKind === "auto_caravan" || vehicleKind === "camper";
+    return (
+      vehicleKind === "auto" ||
+      vehicleKind === "auto_caravan" ||
+      vehicleKind === "camper"
+    );
   }, [vehicleKind]);
 
   async function onLogin() {
@@ -83,7 +89,9 @@ export default function LoginClient() {
         return;
       }
       if (!data.session) {
-        setMsg("Login gelukt, maar geen sessie ontvangen. Check of e-mail bevestiging aan staat.");
+        setMsg(
+          "Login gelukt, maar geen sessie ontvangen. Check of e-mail bevestiging aan staat."
+        );
         return;
       }
       router.replace(nextUrl);
@@ -116,7 +124,7 @@ export default function LoginClient() {
   async function onRegister() {
     setMsg(null);
 
-    // simpele validatie
+    // simpele validatie (zoals je vroeg: verplicht)
     if (!nickname.trim()) return setMsg("Nickname is verplicht.");
     if (!firstName.trim()) return setMsg("Voornaam is verplicht.");
     if (!lastName.trim()) return setMsg("Naam is verplicht.");
@@ -127,9 +135,8 @@ export default function LoginClient() {
     if (!country.trim()) return setMsg("Land is verplicht.");
     if (!email.trim()) return setMsg("E-mail is verplicht.");
     if (!password) return setMsg("Wachtwoord is verplicht.");
-
-    // voertuig naam verplicht (ook voor fiets/te voet, anders toon je niks)
-    if (!vehicleName.trim()) return setMsg("Geef een naam/type voor je vervoersmiddel (bv. 'Camper Swa').");
+    if (!vehicleName.trim())
+      return setMsg("Geef een naam/type voor je vervoersmiddel (bv. 'Camper Swa').");
 
     setBusy(true);
     try {
@@ -152,14 +159,14 @@ export default function LoginClient() {
 
       const userId = data.user?.id;
       if (!userId) {
-        // bij sommige settings (email confirm) kan user id ontbreken
         setMsg("Account aangemaakt. Bevestig je e-mail en log daarna in.");
         setMode("login");
         return;
       }
 
-      // 1) user_profiles upsert
-      const { error: profErr } = await supabase
+      // ✅ TypeScript-fix: jouw database.types kent 'user_profiles' nog niet.
+      // (Runtime werkt enkel als de tabel echt bestaat in Supabase.)
+      const { error: profErr } = await (supabase as any)
         .from("user_profiles")
         .upsert(
           {
@@ -182,7 +189,7 @@ export default function LoginClient() {
         return;
       }
 
-      // 2) camper_profiles upsert (vehicle)
+      // 2) camper_profiles upsert (vehicle) (zit wél in jouw types)
       const { error: campErr } = await supabase
         .from("camper_profiles")
         .upsert(
@@ -192,9 +199,11 @@ export default function LoginClient() {
             vehicle_name: vehicleName.trim(),
             vehicle_model: vehicleModel.trim() || null,
             fuel_type: vehicleNeedsFuel ? fuelType : null,
-            avg_consumption: vehicleNeedsFuel && avgConsumption ? Number(avgConsumption) : null,
-            tank_capacity: vehicleNeedsFuel && tankCapacity ? Number(tankCapacity) : null,
-          },
+            avg_consumption:
+              vehicleNeedsFuel && avgConsumption ? Number(avgConsumption) : null,
+            tank_capacity:
+              vehicleNeedsFuel && tankCapacity ? Number(tankCapacity) : null,
+          } as any,
           { onConflict: "user_id" }
         );
 
@@ -203,7 +212,6 @@ export default function LoginClient() {
         return;
       }
 
-      // als signup meteen sessie geeft -> doorsturen, anders naar login
       const { data: s } = await supabase.auth.getSession();
       if (s.session) {
         router.replace(nextUrl);
@@ -221,38 +229,55 @@ export default function LoginClient() {
   return (
     <main className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-xl flex flex-col items-center">
-        {/* Logo block: groter + dichter bij tekst */}
+        {/* Logo block: groot + dichter bij tekst */}
         <div className="flex flex-col items-center gap-2 mb-4">
           <Image
             src="/brand/drivemapz-logo.png"
             alt="DriveMapz"
-            width={220}
-            height={220}
+            width={240}
+            height={240}
             priority
           />
-          <h1 className="text-4xl font-bold leading-tight -mt-2">DriveMapz</h1>
-          <p className="text-sm text-neutral-600 -mt-1">Trips • Stops • Fuel • Toll • Tracking</p>
+          <h1 className="text-4xl font-bold leading-tight -mt-3">DriveMapz</h1>
+          <p className="text-sm text-neutral-600 -mt-2">
+            Trips • Stops • Fuel • Toll • Tracking
+          </p>
         </div>
 
         <div className="w-full max-w-md border rounded-2xl p-4">
           <div className="flex gap-2 mb-4">
             <button
-              className={`px-3 py-2 rounded-lg border ${mode === "login" ? "bg-black text-white" : ""}`}
-              onClick={() => { setMode("login"); setMsg(null); }}
+              className={`px-3 py-2 rounded-lg border ${
+                mode === "login" ? "bg-black text-white" : ""
+              }`}
+              onClick={() => {
+                setMode("login");
+                setMsg(null);
+              }}
               type="button"
             >
               Login
             </button>
             <button
-              className={`px-3 py-2 rounded-lg border ${mode === "register" ? "bg-black text-white" : ""}`}
-              onClick={() => { setMode("register"); setMsg(null); }}
+              className={`px-3 py-2 rounded-lg border ${
+                mode === "register" ? "bg-black text-white" : ""
+              }`}
+              onClick={() => {
+                setMode("register");
+                setMsg(null);
+              }}
               type="button"
             >
               Registreren
             </button>
             <button
-              className={`ml-auto px-3 py-2 rounded-lg border ${mode === "reset" ? "bg-black text-white" : ""}`}
-              onClick={() => { setMode("reset"); setMsg(null); }}
+              className={`ml-auto px-3 py-2 rounded-lg border ${
+                mode === "reset" ? "bg-black text-white" : ""
+              }`}
+              onClick={() => {
+                setMode("reset");
+                setMsg(null);
+              }}
               type="button"
             >
               Wachtwoord vergeten
@@ -289,62 +314,83 @@ export default function LoginClient() {
                 <h2 className="text-sm font-semibold mb-2">Account</h2>
 
                 <label className="block text-sm font-medium mb-1">Nickname</label>
-                <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                  value={nickname} onChange={(e) => setNickname(e.target.value)}
+                <input
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
                   placeholder="bv. Pedro"
                 />
 
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">Voornaam</label>
-                    <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                      value={firstName} onChange={(e) => setFirstName(e.target.value)}
+                    <input
+                      className="w-full border rounded-lg px-3 py-2 mb-3"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
                       placeholder="Voornaam"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Naam</label>
-                    <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                      value={lastName} onChange={(e) => setLastName(e.target.value)}
+                    <input
+                      className="w-full border rounded-lg px-3 py-2 mb-3"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
                       placeholder="Naam"
                     />
                   </div>
                 </div>
 
-                <h2 className="text-sm font-semibold mb-2 mt-2">Adres (vertrekpunt standaard)</h2>
+                <h2 className="text-sm font-semibold mb-2 mt-2">
+                  Adres (vertrekpunt standaard)
+                </h2>
+
                 <label className="block text-sm font-medium mb-1">Straat</label>
-                <input className="w-full border rounded-lg px-3 py-2 mb-2"
-                  value={street} onChange={(e) => setStreet(e.target.value)}
+                <input
+                  className="w-full border rounded-lg px-3 py-2 mb-2"
+                  value={street}
+                  onChange={(e) => setStreet(e.target.value)}
                   placeholder="Straat"
                 />
 
                 <div className="grid grid-cols-3 gap-2">
                   <div>
                     <label className="block text-sm font-medium mb-1">Nr</label>
-                    <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                      value={houseNumber} onChange={(e) => setHouseNumber(e.target.value)}
+                    <input
+                      className="w-full border rounded-lg px-3 py-2 mb-3"
+                      value={houseNumber}
+                      onChange={(e) => setHouseNumber(e.target.value)}
                       placeholder="Nr"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Bus</label>
-                    <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                      value={bus} onChange={(e) => setBus(e.target.value)}
+                    <input
+                      className="w-full border rounded-lg px-3 py-2 mb-3"
+                      value={bus}
+                      onChange={(e) => setBus(e.target.value)}
                       placeholder="Optioneel"
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">Postcode</label>
-                    <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                      value={postalCode} onChange={(e) => setPostalCode(e.target.value)}
+                    <input
+                      className="w-full border rounded-lg px-3 py-2 mb-3"
+                      value={postalCode}
+                      onChange={(e) => setPostalCode(e.target.value)}
                       placeholder="Postcode"
                     />
                   </div>
                 </div>
 
-                <label className="block text-sm font-medium mb-1">Gemeente / Stad</label>
-                <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                  value={city} onChange={(e) => setCity(e.target.value)}
+                <label className="block text-sm font-medium mb-1">
+                  Gemeente / Stad
+                </label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
                   placeholder="Gemeente / Stad"
                 />
 
@@ -357,7 +403,9 @@ export default function LoginClient() {
                   placeholder="Kies of typ een land"
                 />
                 <datalist id="eu-countries">
-                  {EU_COUNTRIES.map((c) => <option key={c} value={c} />)}
+                  {EU_COUNTRIES.map((c) => (
+                    <option key={c} value={c} />
+                  ))}
                 </datalist>
 
                 <h2 className="text-sm font-semibold mb-2 mt-2">Vervoersmiddel</h2>
@@ -368,24 +416,36 @@ export default function LoginClient() {
                   value={vehicleKind}
                   onChange={(e) => setVehicleKind(e.target.value as any)}
                 >
-                  {VEHICLE_KINDS.map(v => (
-                    <option key={v.value} value={v.value}>{v.label}</option>
+                  {VEHICLE_KINDS.map((v) => (
+                    <option key={v.value} value={v.value}>
+                      {v.label}
+                    </option>
                   ))}
                 </select>
 
                 <label className="block text-sm font-medium mb-1">Naam / Type</label>
-                <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                  value={vehicleName} onChange={(e) => setVehicleName(e.target.value)}
+                <input
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                  value={vehicleName}
+                  onChange={(e) => setVehicleName(e.target.value)}
                   placeholder="bv. Camper Swa / Golf 7 / Fiets"
                 />
 
-                <label className="block text-sm font-medium mb-1">Model (optioneel)</label>
-                <input className="w-full border rounded-lg px-3 py-2 mb-3"
-                  value={vehicleModel} onChange={(e) => setVehicleModel(e.target.value)}
+                <label className="block text-sm font-medium mb-1">
+                  Model (optioneel)
+                </label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 mb-3"
+                  value={vehicleModel}
+                  onChange={(e) => setVehicleModel(e.target.value)}
                   placeholder="bv. Roller Team Granduca 2006"
                 />
 
-                <div className={`grid grid-cols-2 gap-2 ${vehicleNeedsFuel ? "" : "opacity-50"}`}>
+                <div
+                  className={`grid grid-cols-2 gap-2 ${
+                    vehicleNeedsFuel ? "" : "opacity-50"
+                  }`}
+                >
                   <div>
                     <label className="block text-sm font-medium mb-1">Brandstof</label>
                     <select
@@ -394,13 +454,17 @@ export default function LoginClient() {
                       onChange={(e) => setFuelType(e.target.value as any)}
                       disabled={!vehicleNeedsFuel}
                     >
-                      {FUEL_TYPES.map(f => (
-                        <option key={f.value} value={f.value}>{f.label}</option>
+                      {FUEL_TYPES.map((f) => (
+                        <option key={f.value} value={f.value}>
+                          {f.label}
+                        </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Verbruik (L/100km)</label>
+                    <label className="block text-sm font-medium mb-1">
+                      Verbruik (L/100km)
+                    </label>
                     <input
                       className="w-full border rounded-lg px-3 py-2 mb-3"
                       value={avgConsumption}
@@ -412,7 +476,13 @@ export default function LoginClient() {
                   </div>
                 </div>
 
-                <label className={`block text-sm font-medium mb-1 ${vehicleNeedsFuel ? "" : "opacity-50"}`}>Tank (liter)</label>
+                <label
+                  className={`block text-sm font-medium mb-1 ${
+                    vehicleNeedsFuel ? "" : "opacity-50"
+                  }`}
+                >
+                  Tank (liter)
+                </label>
                 <input
                   className="w-full border rounded-lg px-3 py-2 mb-3"
                   value={tankCapacity}
@@ -425,11 +495,7 @@ export default function LoginClient() {
             </>
           )}
 
-          {msg && (
-            <div className="mt-2 mb-2 text-sm border rounded-lg p-2">
-              {msg}
-            </div>
-          )}
+          {msg && <div className="mt-2 mb-2 text-sm border rounded-lg p-2">{msg}</div>}
 
           {mode === "login" && (
             <button
