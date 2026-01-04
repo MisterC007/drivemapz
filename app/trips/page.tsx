@@ -36,6 +36,7 @@ export default function TripsHome() {
 
       setReady(true);
     })();
+
     return () => {
       alive = false;
     };
@@ -47,8 +48,6 @@ export default function TripsHome() {
     <main className="mx-auto max-w-3xl p-6">
       <h1 className="text-3xl font-semibold">Trips</h1>
       <p className="mt-2 text-sm opacity-70">Je bent ingelogd ✅</p>
-
-      {/* Hier later: lijst trips + nieuwe trip maken */}
     </main>
   );
 }
