@@ -32,7 +32,7 @@ const FUEL_TYPES = [
 ] as const;
 
 export default function LoginClient() {
-  const supabase = supabaseBrowser();
+  const supabase = supabaseBrowser;
   const router = useRouter();
   const sp = useSearchParams();
 
