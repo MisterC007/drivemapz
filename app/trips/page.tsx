@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "../lib/supabaseBrowser";
+import { supabaseBrowser } from "@/app/lib/supabase/browser";
 
 type TripRow = {
   id: string;
@@ -11,7 +11,7 @@ type TripRow = {
 };
 
 export default function TripsPage() {
-  const supabase = supabaseBrowser();
+  const supabase = useMemo(() => supabaseBrowser(), []);
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -36,7 +36,7 @@ export default function TripsPage() {
 
     setEmail(session.user.email || "");
 
-    // profiel
+    // profiel -> nickname
     const { data: prof, error: profErr } = await supabase
       .from("user_profiles")
       .select("nickname")
@@ -81,7 +81,6 @@ export default function TripsPage() {
         return;
       }
 
-      // BELANGRIJK: kolom is "name" (niet "title")
       const { error } = await supabase.from("trips").insert({
         user_id: session.user.id,
         name: title,
@@ -115,8 +114,12 @@ export default function TripsPage() {
         </div>
 
         <div className="flex gap-2">
-          <Link className="border rounded-lg px-3 py-2" href="/settings">Instellingen</Link>
-          <button className="border rounded-lg px-3 py-2" onClick={logout}>Uitloggen</button>
+          <Link className="border rounded-lg px-3 py-2" href="/settings">
+            Instellingen
+          </Link>
+          <button className="border rounded-lg px-3 py-2" onClick={logout}>
+            Uitloggen
+          </button>
         </div>
       </div>
 
@@ -150,9 +153,14 @@ export default function TripsPage() {
       ) : (
         <ul className="mt-4 space-y-2">
           {trips.map((t) => (
-            <li key={t.id} className="border rounded-lg p-3 flex items-center justify-between">
+            <li
+              key={t.id}
+              className="border rounded-lg p-3 flex items-center justify-between"
+            >
               <div className="font-medium">{t.name}</div>
-              <Link className="underline" href={`/trips/${t.id}`}>Open</Link>
+              <Link className="underline" href={`/trips/${t.id}`}>
+                Open
+              </Link>
             </li>
           ))}
         </ul>
