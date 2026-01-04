@@ -128,7 +128,7 @@ export default function LoginClient() {
         <img
           src="/brand/drivemapz-logo.png"
           alt="DriveMapz"
-          className="h-64 w-auto mb-2"
+          className="h-64 w-auto mb-0"
         />
         <div className="text-sm opacity-70">Trips • Stops • Fuel • Toll • Tracking</div>
       </div>
