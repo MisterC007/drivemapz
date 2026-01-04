@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-function getSupabaseBrowserClient(): SupabaseClient | null {
+function getSupabase(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return null;
@@ -23,40 +23,39 @@ export default function LoginClient() {
   const search = useSearchParams();
   const next = search.get('next') || '/trips';
 
-  const supabase = useMemo(() => getSupabaseBrowserClient(), []);
+  const supabase = useMemo(() => getSupabase(), []);
   const supabaseReady = !!supabase;
 
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
-  const [msg, setMsg] = useState<string>('');
+  const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
+    let alive = true;
 
-    async function checkSession() {
+    async function check() {
       if (!supabase) return;
-      try {
-        const { data } = await supabase.auth.getSession();
-        if (!mounted) return;
-        if (data?.session) router.replace(next);
-      } catch {
-        // ignore
-      }
+      const { data } = await supabase.auth.getSession();
+      if (!alive) return;
+      if (data.session) router.replace(next);
     }
 
-    checkSession();
+    check();
     return () => {
-      mounted = false;
+      alive = false;
     };
   }, [supabase, router, next]);
 
   async function doLogin() {
-    if (!supabase) return;
-
     setMsg('');
+    if (!supabase) {
+      setMsg('Supabase ontbreekt. Check NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+
     setBusy(true);
     try {
       const e = email.trim();
@@ -68,16 +67,19 @@ export default function LoginClient() {
 
       router.replace(next);
     } catch (e: any) {
-      setMsg(e?.message ?? String(e));
+      setMsg(`Login fout: ${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
   }
 
   async function doSignup() {
-    if (!supabase) return;
-
     setMsg('');
+    if (!supabase) {
+      setMsg('Supabase ontbreekt. Check NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+
     setBusy(true);
     try {
       const e = email.trim();
@@ -87,35 +89,34 @@ export default function LoginClient() {
       const { error } = await supabase.auth.signUp({ email: e, password });
       if (error) throw error;
 
-      setMsg('Account aangemaakt ✅ (check je mailbox als bevestiging aan staat).');
+      setMsg('Account aangemaakt. Check je mailbox indien bevestiging nodig is.');
       setMode('login');
     } catch (e: any) {
-      setMsg(e?.message ?? String(e));
+      setMsg(`Registratie fout: ${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
   }
 
   async function doForgot() {
-    if (!supabase) return;
-
     setMsg('');
+    if (!supabase) {
+      setMsg('Supabase ontbreekt. Check NEXT_PUBLIC_SUPABASE_URL en NEXT_PUBLIC_SUPABASE_ANON_KEY.');
+      return;
+    }
+
     setBusy(true);
     try {
       const e = forgotEmail.trim();
       if (!e) throw new Error('Vul je e-mailadres in.');
 
-      const redirectTo =
-        typeof window !== 'undefined'
-          ? `${window.location.origin}/reset-password`
-          : 'https://drivemapz.com/reset-password';
-
+      const redirectTo = `${window.location.origin}/reset-password`;
       const { error } = await supabase.auth.resetPasswordForEmail(e, { redirectTo });
       if (error) throw error;
 
-      setMsg('Reset-mail verzonden ✅ Check je mailbox (en spam).');
+      setMsg('Reset-mail verzonden. Check je mailbox (en spam).');
     } catch (e: any) {
-      setMsg(e?.message ?? String(e));
+      setMsg(`Reset fout: ${e?.message ?? String(e)}`);
     } finally {
       setBusy(false);
     }
@@ -124,34 +125,16 @@ export default function LoginClient() {
   return (
     <main className="mx-auto max-w-md p-6">
       <div className="flex flex-col items-center gap-3 mt-8">
-	<img
-		src="/brand/drivemapz-logo.png"
-		alt="DriveMapz"
-		className="h-32 w-auto mb-2"
-	/>
-		<div className="text-sm opacity-70 mt-2">
-		Trips • Stops • Fuel • Toll • Tracking
-		</div>
-
+        <img
+          src="/brand/drivemapz-logo.png"
+          alt="DriveMapz"
+          className="h-32 w-auto mb-2"
+        />
+        <div className="text-sm opacity-70">Trips • Stops • Fuel • Toll • Tracking</div>
+      </div>
 
       <section className="mt-8 rounded-2xl border p-5">
-        {!supabaseReady && (
-          <div className="rounded-xl border px-4 py-3 text-sm">
-            <div className="font-semibold mb-1">Supabase config ontbreekt</div>
-            <div className="opacity-80">
-              Zet in <code>.env.local</code>:
-              <div className="mt-2">
-                <code className="block">NEXT_PUBLIC_SUPABASE_URL=...</code>
-                <code className="block">NEXT_PUBLIC_SUPABASE_ANON_KEY=...</code>
-              </div>
-              <div className="mt-2 opacity-80">
-                Daarna: dev server herstarten (<code>npm run dev</code>).
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="flex gap-2 mb-4 mt-4">
+        <div className="flex gap-2 mb-4">
           <button
             className={`rounded-lg border px-3 py-2 text-sm ${mode === 'login' ? 'bg-black text-white' : ''}`}
             onClick={() => setMode('login')}
@@ -205,7 +188,7 @@ export default function LoginClient() {
               disabled={!supabaseReady || busy}
               onClick={mode === 'login' ? doLogin : doSignup}
             >
-              {busy ? 'Even geduld...' : mode === 'login' ? 'Login' : 'Account aanmaken'}
+              {busy ? 'Even geduld…' : mode === 'login' ? 'Login' : 'Account aanmaken'}
             </button>
           </>
         ) : (
@@ -225,7 +208,7 @@ export default function LoginClient() {
               disabled={!supabaseReady || busy}
               onClick={doForgot}
             >
-              {busy ? 'Even geduld...' : 'Stuur reset-mail'}
+              {busy ? 'Even geduld…' : 'Stuur reset-mail'}
             </button>
           </>
         )}
