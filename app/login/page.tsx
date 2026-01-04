@@ -1,26 +1,38 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
-function supabaseBrowser() {
+function createSupabaseBrowserClient(): SupabaseClient | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // Geen env vars? Dan geen crash → we tonen een nette melding in de UI
+  if (!url || !key) return null;
+
+  // Single instance in browser
   const g = globalThis as any;
   if (!g.__sb) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     g.__sb = createClient(url, key, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
     });
   }
-  return g.__sb as ReturnType<typeof createClient>;
+  return g.__sb as SupabaseClient;
 }
 
 export default function LoginPage() {
-  const supabase = useMemo(() => supabaseBrowser(), []);
   const router = useRouter();
 
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const supabaseReady = !!supabase;
+
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>('login');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
@@ -28,15 +40,45 @@ export default function LoginPage() {
   const [msg, setMsg] = useState<string>('');
   const [busy, setBusy] = useState(false);
 
+  // Als al ingelogd → direct naar home
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkSession() {
+      if (!supabase) return;
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!mounted) return;
+        if (data?.session) {
+          router.replace('/');
+        }
+      } catch {
+        // stil houden; we tonen geen errors hiervoor
+      }
+    }
+
+    checkSession();
+    return () => {
+      mounted = false;
+    };
+  }, [supabase, router]);
+
   async function doLogin() {
+    if (!supabase) return;
+
     setMsg('');
     setBusy(true);
     try {
+      const e = email.trim();
+      if (!e) throw new Error('Vul je e-mailadres in.');
+      if (!password) throw new Error('Vul je wachtwoord in.');
+
       const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
+        email: e,
         password,
       });
       if (error) throw error;
+
       router.replace('/');
     } catch (e: any) {
       setMsg(e?.message ?? String(e));
@@ -46,15 +88,22 @@ export default function LoginPage() {
   }
 
   async function doSignup() {
+    if (!supabase) return;
+
     setMsg('');
     setBusy(true);
     try {
+      const e = email.trim();
+      if (!e) throw new Error('Vul je e-mailadres in.');
+      if (!password) throw new Error('Vul een wachtwoord in.');
+
       const { error } = await supabase.auth.signUp({
-        email: email.trim(),
+        email: e,
         password,
       });
       if (error) throw error;
-      setMsg('Account aangemaakt ✅ (check je mailbox als email-confirm aan staat).');
+
+      setMsg('Account aangemaakt ✅ (check je mailbox als e-mail bevestiging aan staat).');
       setMode('login');
     } catch (e: any) {
       setMsg(e?.message ?? String(e));
@@ -64,13 +113,15 @@ export default function LoginPage() {
   }
 
   async function doForgot() {
+    if (!supabase) return;
+
     setMsg('');
     setBusy(true);
     try {
       const e = forgotEmail.trim();
       if (!e) throw new Error('Vul je e-mailadres in.');
 
-      // ✅ Stuur reset-link naar /reset-password
+      // Reset link naar je eigen reset-password route
       const redirectTo =
         typeof window !== 'undefined'
           ? `${window.location.origin}/reset-password`
@@ -90,28 +141,60 @@ export default function LoginPage() {
   return (
     <main className="mx-auto max-w-md p-6">
       <div className="flex flex-col items-center gap-3 mt-8">
-        <img src="/logo.svg" alt="DriveMapz" className="h-14 w-14" />
+        {/* ✅ Correct pad naar je logo in /public/brand */}
+        <img
+          src="/brand/drivemapz-logo.png"
+          alt="DriveMapz"
+          className="h-16 w-16"
+        />
         <h1 className="text-3xl font-semibold">DriveMapz</h1>
-        <div className="text-sm opacity-70">Trips • Stops • Tank • Tol • Tracking</div>
+        <div className="text-sm opacity-70">Trips • Stops • Fuel • Toll • Tracking</div>
       </div>
 
       <section className="mt-8 rounded-2xl border p-5">
-        <div className="flex gap-2 mb-4">
+        {!supabaseReady && (
+          <div className="rounded-xl border px-4 py-3 text-sm">
+            <div className="font-semibold mb-1">Supabase config ontbreekt</div>
+            <div className="opacity-80">
+              Zet in je <code>.env.local</code>:
+              <div className="mt-2">
+                <code className="block">NEXT_PUBLIC_SUPABASE_URL=...</code>
+                <code className="block">NEXT_PUBLIC_SUPABASE_ANON_KEY=...</code>
+              </div>
+              <div className="mt-2 opacity-80">
+                Daarna: dev server herstarten (<code>npm run dev</code>).
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex gap-2 mb-4 mt-4">
           <button
-            className={`rounded-lg border px-3 py-2 text-sm ${mode === 'login' ? 'bg-black text-white' : ''}`}
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              mode === 'login' ? 'bg-black text-white' : ''
+            }`}
             onClick={() => setMode('login')}
+            disabled={!supabaseReady}
           >
             Login
           </button>
+
           <button
-            className={`rounded-lg border px-3 py-2 text-sm ${mode === 'signup' ? 'bg-black text-white' : ''}`}
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              mode === 'signup' ? 'bg-black text-white' : ''
+            }`}
             onClick={() => setMode('signup')}
+            disabled={!supabaseReady}
           >
             Registreren
           </button>
+
           <button
-            className={`ml-auto rounded-lg border px-3 py-2 text-sm ${mode === 'forgot' ? 'bg-black text-white' : ''}`}
+            className={`ml-auto rounded-lg border px-3 py-2 text-sm ${
+              mode === 'forgot' ? 'bg-black text-white' : ''
+            }`}
             onClick={() => setMode('forgot')}
+            disabled={!supabaseReady}
           >
             Wachtwoord vergeten
           </button>
@@ -126,6 +209,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="jij@voorbeeld.be"
               autoComplete="email"
+              disabled={!supabaseReady || busy}
             />
 
             <label className="block text-sm mt-4">Wachtwoord</label>
@@ -136,14 +220,15 @@ export default function LoginPage() {
               placeholder="••••••••"
               type="password"
               autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+              disabled={!supabaseReady || busy}
             />
 
             <button
               className="mt-5 w-full rounded-lg bg-black px-5 py-2 text-white disabled:opacity-60"
-              disabled={busy}
+              disabled={!supabaseReady || busy}
               onClick={mode === 'login' ? doLogin : doSignup}
             >
-              {mode === 'login' ? 'Login' : 'Account aanmaken'}
+              {busy ? 'Even geduld...' : mode === 'login' ? 'Login' : 'Account aanmaken'}
             </button>
           </>
         ) : (
@@ -155,14 +240,15 @@ export default function LoginPage() {
               onChange={(e) => setForgotEmail(e.target.value)}
               placeholder="jij@voorbeeld.be"
               autoComplete="email"
+              disabled={!supabaseReady || busy}
             />
 
             <button
               className="mt-5 w-full rounded-lg bg-black px-5 py-2 text-white disabled:opacity-60"
-              disabled={busy}
+              disabled={!supabaseReady || busy}
               onClick={doForgot}
             >
-              Stuur reset-mail
+              {busy ? 'Even geduld...' : 'Stuur reset-mail'}
             </button>
 
             <div className="mt-3 text-xs opacity-70">
