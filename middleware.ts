@@ -6,11 +6,13 @@ export async function middleware(req: NextRequest) {
 
   // Publieke routes (toegankelijk zonder login)
   const isPublic =
-    pathname === "/login" ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname.startsWith("/brand") ||
-    pathname.startsWith("/api");
+  pathname === "/login" ||
+  pathname === "/reset-password" ||
+  pathname.startsWith("/_next") ||
+  pathname.startsWith("/favicon") ||
+  pathname.startsWith("/brand") ||
+  pathname.startsWith("/api");
+
 
   // Supabase server client met cookie bridge (middleware/edge safe)
   let res = NextResponse.next({
