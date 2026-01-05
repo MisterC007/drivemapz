@@ -1,0 +1,5 @@
+cd C:\Projects\drivemapz
+npm run build
+git add .
+git commit -m "Fix supabaseBrowser imports (trips + trip page + reset password)"
+git push
